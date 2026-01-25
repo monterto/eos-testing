@@ -1,5 +1,5 @@
-const CACHE_NAME = 'calculator-hub-v6';
-const RUNTIME_CACHE = 'calculator-hub-runtime-v6';
+const CACHE_NAME = 'eos-testing-v1';
+const RUNTIME_CACHE = 'eos-testing-v1';
 
 // List of files to cache for offline use
 const urlsToCache = [

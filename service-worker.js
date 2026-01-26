@@ -1,104 +1,75 @@
-const CACHE_NAME = 'eos-testing-v1';
-const RUNTIME_CACHE = 'eos-testing-v1';
+const VERSION = 'v7'; // Increment this to force a full update
+const CACHE_NAME = `calculator-hub-${VERSION}`;
+const RUNTIME_CACHE = `calculator-hub-runtime-${VERSION}`;
 
-// List of files to cache for offline use
+// Core assets required for the app to function offline
 const urlsToCache = [
   './',
   './index.html',
   './manifest.json',
-  './styles.css',
+  './style.css', 
   './app.js',   
   './icon-192.png',
   './icon-512.png'
 ];
 
-// Install event - cache all necessary files
+// 1. Install Event: Populate the static cache
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[Service Worker] Caching app shell');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => {
-        console.log('[Service Worker] Skip waiting');
-        return self.skipWaiting();
-      })
-      .catch((error) => {
-        console.error('[Service Worker] Cache failed:', error);
-      })
+      .then((cache) => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Activate event - clean up old caches
+// 2. Activate Event: Dynamic Cleanup of ALL old caches
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...');
+  const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
+          // If the cache name isn't in our current whitelist, delete it
+          if (!currentCaches.includes(cacheName)) {
+            console.log('[SW] Purging outdated cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => {
-      console.log('[Service Worker] Claiming clients');
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// 3. Fetch Event: Offline-First Strategy
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        // Return cached version if available
-        if (cachedResponse) {
-          console.log('[Service Worker] Serving from cache:', event.request.url);
-          return cachedResponse;
+    caches.match(event.request).then((cachedResponse) => {
+      // Return the cached asset if found
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      // Otherwise, hit the network and store the result in the runtime cache
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
         }
 
-        // Otherwise fetch from network
-        console.log('[Service Worker] Fetching from network:', event.request.url);
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+        const responseToCache = response.clone();
+        caches.open(RUNTIME_CACHE).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
 
-            // Clone the response
-            const responseToCache = response.clone();
-
-            // Cache the fetched response for future use
-            caches.open(RUNTIME_CACHE)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          })
-          .catch((error) => {
-            console.error('[Service Worker] Fetch failed:', error);
-            // If both cache and network fail, you could return a custom offline page here
-            throw error;
-          });
-      })
+        return response;
+      }).catch(() => {
+        // Fallback for navigation (ensures deep-linked URLs load the app shell)
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
+    })
   );
-});
-
-// Handle offline functionality
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
 });

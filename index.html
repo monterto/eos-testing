@@ -5,29 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>End of Shift Tools</title>
   
-  <!-- PWA Manifest -->
   <link rel="manifest" href="./manifest.json">
   
-  <!-- Theme colors -->
   <meta name="theme-color" content="#4da3ff">
   <meta name="msapplication-TileColor" content="#4da3ff">
   
-  <!-- iOS specific meta tags -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="EoS Tools">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="./icon-512.png">
   
-  <!-- Standard favicon -->
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
   
-  <!-- Windows tiles -->
-  <meta name="msapplication-TileImage" content="./icon-512.png">
-  
-  <!-- Stylesheets -->
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -77,16 +66,14 @@
         
         <h3>iPhone/iPad (Safari)</h3>
         <ol>
-          <li>Tap the <strong>Share button</strong> (square with arrow ↑)</li>
-          <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
-          <li>Tap <strong>"Add"</strong> in the top right</li>
+          <li>Tap the <strong>Share button</strong> (↑)</li>
+          <li>Tap <strong>"Add to Home Screen"</strong></li>
         </ol>
         
         <h3>Android (Chrome)</h3>
         <ol>
           <li>Tap the <strong>three-dot menu</strong> (⋮)</li>
-          <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong></li>
-          <li>Tap <strong>"Install"</strong></li>
+          <li>Tap <strong>"Install app"</strong></li>
         </ol>
         
         <button class="close-modal" id="closeModalBtn">Got it!</button>
@@ -94,19 +81,14 @@
     </div>
   </div>
 
-  <div id="appView">
+  <div id="appView" style="display: none;">
     <div class="app-header">
-      <button class="back-btn" id="backBtn">
-        <span>←</span>
-        <span>Back to Hub</span>
-      </button>
+      <button class="back-btn" id="backBtn">← Back</button>
       <div class="app-title" id="currentAppTitle"></div>
-      <button class="app-info-btn" id="appInfoBtn" title="Field Explanations"></button>
     </div>
     <div class="app-content" id="appContainer"></div>
   </div>
 
-  <!-- JavaScript -->
   <script src="./app.js"></script>
 </body>
 </html>

@@ -1,73 +1,51 @@
-const VERSION = 'v7'; // Increment this to force a full update
-const CACHE_NAME = `calculator-hub-${VERSION}`;
-const RUNTIME_CACHE = `calculator-hub-runtime-${VERSION}`;
+const VERSION = 'v8'; 
+const CACHE_NAME = `eos-tools-${VERSION}`;
 
-// Core assets required for the app to function offline
-const urlsToCache = [
+const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './style.css', 
-  './app.js',   
+  './styles.css', // Updated to plural to match your index.html
+  './app.js',
   './icon-192.png',
   './icon-512.png'
 ];
 
-// 1. Install Event: Populate the static cache
+// 1. Install: Pre-cache the app shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(urlsToCache))
+      .then((cache) => cache.addAll(ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate Event: Dynamic Cleanup of ALL old caches
+// 2. Activate: Clean up old caches
 self.addEventListener('activate', (event) => {
-  const currentCaches = [CACHE_NAME, RUNTIME_CACHE];
-  
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          // If the cache name isn't in our current whitelist, delete it
-          if (!currentCaches.includes(cacheName)) {
-            console.log('[SW] Purging outdated cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+        keys.filter(key => key !== CACHE_NAME)
+            .map(key => caches.delete(key))
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()) // Immediate control
   );
 });
 
-// 3. Fetch Event: Offline-First Strategy
+// 3. Fetch: Offline-first with Navigation Fallback
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // Return the cached asset if found
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+    caches.match(event.request).then((response) => {
+      // Return cached asset if found
+      if (response) return response;
 
-      // Otherwise, hit the network and store the result in the runtime cache
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-
-        const responseToCache = response.clone();
-        caches.open(RUNTIME_CACHE).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return response;
-      }).catch(() => {
-        // Fallback for navigation (ensures deep-linked URLs load the app shell)
+      // Otherwise try network
+      return fetch(event.request).catch(() => {
+        // FAILSAFE: If offline and refreshing, serve index.html
         if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
+          return caches.match('./index.html') || caches.match('./');
         }
       });
     })

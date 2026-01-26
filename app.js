@@ -1928,15 +1928,18 @@ function initEndOfDay() {
 }
 
 // ============================================
-// SERVICE WORKER & PWA
+// SERVICE WORKER & PWA (Updated for Offline Reliability)
 // ============================================
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('./service-worker.js')
+    // Registering with an explicit root scope to ensure the worker 
+    // intercepts all navigation requests for the app.
+    navigator.serviceWorker.register('./service-worker.js', { scope: './' })
       .then(function(registration) {
-        console.log('Service Worker registered:', registration.scope);
+        console.log('Service Worker registered with scope:', registration.scope);
         
+        // Listener for updates to alert the user when a new version is ready
         registration.addEventListener('updatefound', function() {
           const newWorker = registration.installing;
           newWorker.addEventListener('statechange', function() {
@@ -1951,19 +1954,3 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
-
-window.addEventListener('load', function() {
-  var displayMode = 'browser';
-  if (window.matchMedia('(display-mode: standalone)').matches) {
-    displayMode = 'standalone';
-  } else if (window.navigator.standalone === true) {
-    displayMode = 'standalone-ios';
-  }
-  console.log('Display mode:', displayMode);
-});
-
-document.body.addEventListener('touchmove', function(e) {
-  if (e.target === document.body) {
-    e.preventDefault();
-  }
-}, { passive: false });

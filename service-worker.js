@@ -1,53 +1,104 @@
-const VERSION = 'v8'; 
-const CACHE_NAME = `eos-tools-${VERSION}`;
+const CACHE_NAME = 'eos-testingv1';
+const RUNTIME_CACHE = 'eos-testingv1';
 
-const ASSETS = [
+// List of files to cache for offline use
+const urlsToCache = [
   './',
   './index.html',
   './manifest.json',
-  './styles.css', // Updated to plural to match your index.html
-  './app.js',
+  './styles.css',
+  './app.js',   
   './icon-192.png',
   './icon-512.png'
 ];
 
-// 1. Install: Pre-cache the app shell
+// Install event - cache all necessary files
 self.addEventListener('install', (event) => {
+  console.log('[Service Worker] Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+      .then((cache) => {
+        console.log('[Service Worker] Caching app shell');
+        return cache.addAll(urlsToCache);
+      })
+      .then(() => {
+        console.log('[Service Worker] Skip waiting');
+        return self.skipWaiting();
+      })
+      .catch((error) => {
+        console.error('[Service Worker] Cache failed:', error);
+      })
   );
 });
 
-// 2. Activate: Clean up old caches
+// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activating...');
   event.waitUntil(
-    caches.keys().then((keys) => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
       );
-    }).then(() => self.clients.claim()) // Immediate control
-  );
-});
-
-// 3. Fetch: Offline-first with Navigation Fallback
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      // Return cached asset if found
-      if (response) return response;
-
-      // Otherwise try network
-      return fetch(event.request).catch(() => {
-        // FAILSAFE: If offline and refreshing, serve index.html
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html') || caches.match('./');
-        }
-      });
+    }).then(() => {
+      console.log('[Service Worker] Claiming clients');
+      return self.clients.claim();
     })
   );
+});
+
+// Fetch event - serve from cache, fallback to network
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request)
+      .then((cachedResponse) => {
+        // Return cached version if available
+        if (cachedResponse) {
+          console.log('[Service Worker] Serving from cache:', event.request.url);
+          return cachedResponse;
+        }
+
+        // Otherwise fetch from network
+        console.log('[Service Worker] Fetching from network:', event.request.url);
+        return fetch(event.request)
+          .then((response) => {
+            // Don't cache non-successful responses
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response
+            const responseToCache = response.clone();
+
+            // Cache the fetched response for future use
+            caches.open(RUNTIME_CACHE)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
+          .catch((error) => {
+            console.error('[Service Worker] Fetch failed:', error);
+            // If both cache and network fail, you could return a custom offline page here
+            throw error;
+          });
+      })
+  );
+});
+
+// Handle offline functionality
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

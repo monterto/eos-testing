@@ -551,6 +551,8 @@ function initTipCalc() {
   const usd = n => "$" + round2(n).toFixed(2);
 
   let currentTipValue = 0;
+  let previousBohValue = '';
+  let previousFohValue = '';
 
   function validateInput(input) {
     const value = parseFloat(input.value);
@@ -610,8 +612,44 @@ function initTipCalc() {
       bohPercent.value = DEFAULT_BOH;
       fohPercent.value = DEFAULT_FOH;
     }
+    previousBohValue = bohPercent.value;
+    previousFohValue = fohPercent.value;
     calculate();
   }
+
+  // Confirmation for BoH% changes
+  bohPercent.addEventListener('focus', function() {
+    previousBohValue = this.value;
+  });
+
+  bohPercent.addEventListener('blur', function() {
+    if (this.value !== previousBohValue && this.value !== '') {
+      const confirmed = confirm('Change Back of House percentage to ' + this.value + '%?');
+      if (!confirmed) {
+        this.value = previousBohValue;
+      } else {
+        previousBohValue = this.value;
+      }
+      calculate();
+    }
+  });
+
+  // Confirmation for FoH% changes
+  fohPercent.addEventListener('focus', function() {
+    previousFohValue = this.value;
+  });
+
+  fohPercent.addEventListener('blur', function() {
+    if (this.value !== previousFohValue && this.value !== '') {
+      const confirmed = confirm('Change Support percentage to ' + this.value + '%?');
+      if (!confirmed) {
+        this.value = previousFohValue;
+      } else {
+        previousFohValue = this.value;
+      }
+      calculate();
+    }
+  });
 
   savePresetBtn.addEventListener('click', function() {
     const bohVal = parseFloat(bohPercent.value) || 0;
@@ -1928,18 +1966,15 @@ function initEndOfDay() {
 }
 
 // ============================================
-// SERVICE WORKER & PWA (Updated for Offline Reliability)
+// SERVICE WORKER & PWA
 // ============================================
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    // Registering with an explicit root scope to ensure the worker 
-    // intercepts all navigation requests for the app.
-    navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+    navigator.serviceWorker.register('./service-worker.js')
       .then(function(registration) {
-        console.log('Service Worker registered with scope:', registration.scope);
+        console.log('Service Worker registered:', registration.scope);
         
-        // Listener for updates to alert the user when a new version is ready
         registration.addEventListener('updatefound', function() {
           const newWorker = registration.installing;
           newWorker.addEventListener('statechange', function() {
@@ -1954,3 +1989,19 @@ if ('serviceWorker' in navigator) {
       });
   });
 }
+
+window.addEventListener('load', function() {
+  var displayMode = 'browser';
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    displayMode = 'standalone';
+  } else if (window.navigator.standalone === true) {
+    displayMode = 'standalone-ios';
+  }
+  console.log('Display mode:', displayMode);
+});
+
+document.body.addEventListener('touchmove', function(e) {
+  if (e.target === document.body) {
+    e.preventDefault();
+  }
+}, { passive: false });

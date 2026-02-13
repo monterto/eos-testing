@@ -243,8 +243,124 @@ function getTipCalcHTML() {
     font-weight: 500;
   }
   
-  .tip-party-section {
+  .tip-party-display {
     grid-column: 1 / 2;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  
+  .tip-party-display-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  
+  .tip-party-display-field label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 500;
+    opacity: 0.7;
+  }
+  
+  .tip-party-display-value {
+    background-color: #0c0e13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--text);
+    font-weight: 500;
+    text-align: left;
+  }
+  
+  .tip-party-edit-btn {
+    width: 40px;
+    height: 40px;
+    background-color: rgba(12, 14, 19, 0.5);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.7;
+    transition: all 0.2s;
+    align-self: end;
+  }
+  
+  .tip-party-edit-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background-color: rgba(77, 163, 255, 0.1);
+    opacity: 1;
+  }
+  
+  .tip-party-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 1rem;
+  }
+  
+  .tip-party-modal.show {
+    display: flex;
+  }
+  
+  .tip-party-modal-content {
+    background: var(--card);
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 1.5rem;
+    max-width: 420px;
+    width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  
+  .tip-party-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border);
+  }
+  
+  .tip-party-modal-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  
+  .tip-party-modal-close {
+    background-color: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  
+  .tip-party-modal-close:hover {
+    border-color: var(--warning);
+    color: var(--warning);
+  }
+  
+  .tip-party-section {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -550,10 +666,12 @@ function getTipCalcHTML() {
   </div>
 
   <div class="tip-advanced">
-    <div class="tip-party-section">
-      <label>Large Party (1%)</label>
-      <div id="partyContainer"></div>
-      <button class="tip-add-party" id="addPartyBtn">+ Add Party</button>
+    <div class="tip-party-display">
+      <div class="tip-party-display-field">
+        <label>Large Party (1%)</label>
+        <div class="tip-party-display-value" id="partyDisplayValue">$0.00</div>
+      </div>
+      <button class="tip-party-edit-btn" id="openPartyModalBtn" title="Configure Large Parties">⚙️</button>
     </div>
     <div class="tip-field">
       <label>Cash</label>
@@ -603,6 +721,19 @@ function getTipCalcHTML() {
   <div class="tip-pig" id="pigDisplay"></div>
 </div>
 
+<div class="tip-party-modal" id="partyModal">
+  <div class="tip-party-modal-content">
+    <div class="tip-party-modal-header">
+      <span class="tip-party-modal-title">Large Party Configuration</span>
+      <button class="tip-party-modal-close" id="closePartyModalBtn">✕</button>
+    </div>
+    <div class="tip-party-section">
+      <div id="partyContainer"></div>
+      <button class="tip-add-party" id="addPartyBtn">+ Add Party</button>
+    </div>
+  </div>
+</div>
+
 <div class="app-info-modal" id="tipCalcInfoModal">
   <div class="app-info-content">
     <div class="app-info-header">
@@ -612,7 +743,7 @@ function getTipCalcHTML() {
     <ul class="app-info-list">
       <li><strong>Owed</strong> - Total tips owed to you from the POS system</li>
       <li><strong>Total Net Sales</strong> - Your total net sales for the shift</li>
-      <li><strong>Large Party (1%)</strong> - Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
+      <li><strong>Large Party (1%)</strong> - Click ⚙️ to configure parties. Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
       <li><strong>Cash</strong> - Cash tips received (added to your final tips)</li>
       <li><strong>BoH %</strong> - Percentage of sales going to Back of House staff</li>
       <li><strong>FoH %</strong> - Percentage of sales going to Support staff</li>
@@ -648,6 +779,10 @@ function initTipCalc() {
   const clearBtn = document.getElementById("clearBtn");
   const partyContainer = document.getElementById("partyContainer");
   const addPartyBtn = document.getElementById("addPartyBtn");
+  const partyDisplayValue = document.getElementById("partyDisplayValue");
+  const openPartyModalBtn = document.getElementById("openPartyModalBtn");
+  const partyModal = document.getElementById("partyModal");
+  const closePartyModalBtn = document.getElementById("closePartyModalBtn");
 
   const round2 = n => Math.round(n * 100) / 100;
   const usd = n => "$" + round2(n).toFixed(2);
@@ -679,6 +814,15 @@ function initTipCalc() {
     });
     
     partyContainer.innerHTML = html;
+    
+    // Update main screen display
+    let totalDeduction = 0;
+    largeParties.forEach(function(party) {
+      if (party.headcount && party.costPerHead) {
+        totalDeduction += (party.headcount * party.costPerHead * 0.01);
+      }
+    });
+    partyDisplayValue.textContent = '$' + totalDeduction.toFixed(2);
     
     // Attach event listeners to new inputs
     document.querySelectorAll('.party-headcount').forEach(function(input) {
@@ -722,6 +866,21 @@ function initTipCalc() {
   }
 
   addPartyBtn.addEventListener('click', addParty);
+
+  // Party modal controls
+  openPartyModalBtn.addEventListener('click', function() {
+    partyModal.classList.add('show');
+  });
+
+  closePartyModalBtn.addEventListener('click', function() {
+    partyModal.classList.remove('show');
+  });
+
+  partyModal.addEventListener('click', function(e) {
+    if (e.target === partyModal) {
+      partyModal.classList.remove('show');
+    }
+  });
 
   function validateInput(input) {
     const value = parseFloat(input.value);

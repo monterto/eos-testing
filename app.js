@@ -249,7 +249,7 @@ function getTipCalcHTML() {
 <div class="tip-party-modal" id="partyModal">
   <div class="tip-party-modal-content">
     <div class="tip-party-modal-header">
-      <span class="tip-party-modal-title">Large Party Configuration</span>
+      <span class="tip-party-modal-title">Add/Edit Large Party</span>
       <button class="tip-party-modal-close" id="closePartyModalBtn">Done</button>
     </div>
     <div class="tip-party-section">
@@ -262,7 +262,7 @@ function getTipCalcHTML() {
 <div class="tip-party-modal" id="percentModal">
   <div class="tip-party-modal-content">
     <div class="tip-party-modal-header">
-      <span class="tip-party-modal-title">Percentage Configuration</span>
+      <span class="tip-party-modal-title">Edit Tip %</span>
       <button class="tip-party-modal-close" id="closePercentModalBtn">Cancel</button>
     </div>
     <div class="tip-percent-edit-section">

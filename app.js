@@ -243,6 +243,105 @@ function getTipCalcHTML() {
     font-weight: 500;
   }
   
+  .tip-party-section {
+    grid-column: 1 / 2;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  
+  .tip-party-section > label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 500;
+    opacity: 0.7;
+  }
+  
+  .tip-party-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 32px;
+    gap: 0.3rem;
+    align-items: end;
+  }
+  
+  .tip-party-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  
+  .tip-party-input label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+  
+  .tip-party-input input {
+    background-color: #0c0e13;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem;
+    font-size: 0.85rem;
+    color: var(--text);
+    font-weight: 500;
+  }
+  
+  .tip-party-input input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  
+  .tip-party-calc {
+    font-size: 0.65rem;
+    color: var(--muted);
+    opacity: 0.5;
+    margin-top: 0.15rem;
+    font-family: monospace;
+  }
+  
+  .tip-party-remove {
+    width: 32px;
+    height: 32px;
+    background-color: rgba(12, 14, 19, 0.5);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.6;
+    transition: all 0.2s;
+  }
+  
+  .tip-party-remove:hover {
+    border-color: var(--warning);
+    color: var(--warning);
+    background-color: rgba(255, 107, 107, 0.1);
+    opacity: 1;
+  }
+  
+  .tip-add-party {
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 0.4rem;
+    font-size: 0.7rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0.5;
+    margin-top: 0.2rem;
+  }
+  
+  .tip-add-party:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    opacity: 0.8;
+  }
+  
   .tip-secondary {
     display: grid;
     grid-template-columns: 1fr 1fr 40px;
@@ -451,9 +550,10 @@ function getTipCalcHTML() {
   </div>
 
   <div class="tip-advanced">
-    <div class="tip-field">
+    <div class="tip-party-section">
       <label>Large Party (1%)</label>
-      <input id="largeParty" type="number" step="0.01" placeholder="0.00" inputmode="decimal" />
+      <div id="partyContainer"></div>
+      <button class="tip-add-party" id="addPartyBtn">+ Add Party</button>
     </div>
     <div class="tip-field">
       <label>Cash</label>
@@ -512,7 +612,7 @@ function getTipCalcHTML() {
     <ul class="app-info-list">
       <li><strong>Owed</strong> - Total tips owed to you from the POS system</li>
       <li><strong>Total Net Sales</strong> - Your total net sales for the shift</li>
-      <li><strong>Large Party (1%)</strong> - Sales from large party (1% is subtracted from tips)</li>
+      <li><strong>Large Party (1%)</strong> - Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
       <li><strong>Cash</strong> - Cash tips received (added to your final tips)</li>
       <li><strong>BoH %</strong> - Percentage of sales going to Back of House staff</li>
       <li><strong>FoH %</strong> - Percentage of sales going to Support staff</li>
@@ -531,12 +631,12 @@ function getTipCalcHTML() {
 function initTipCalc() {
   const DEFAULT_BOH = 5;
   const DEFAULT_FOH = 3;
+  const DEFAULT_COST_PER_HEAD = 65;
 
   const owed = document.getElementById("owed");
   const sales = document.getElementById("sales");
   const bohPercent = document.getElementById("bohPercent");
   const fohPercent = document.getElementById("fohPercent");
-  const largeParty = document.getElementById("largeParty");
   const cash = document.getElementById("cash");
   const bohEl = document.getElementById("boh");
   const fohEl = document.getElementById("foh");
@@ -546,6 +646,8 @@ function initTipCalc() {
   const pigDisplay = document.getElementById("pigDisplay");
   const savePresetBtn = document.getElementById("savePreset");
   const clearBtn = document.getElementById("clearBtn");
+  const partyContainer = document.getElementById("partyContainer");
+  const addPartyBtn = document.getElementById("addPartyBtn");
 
   const round2 = n => Math.round(n * 100) / 100;
   const usd = n => "$" + round2(n).toFixed(2);
@@ -553,6 +655,73 @@ function initTipCalc() {
   let currentTipValue = 0;
   let previousBohValue = '';
   let previousFohValue = '';
+  let largeParties = [];
+
+  function renderParties() {
+    let html = '';
+    largeParties.forEach(function(party, index) {
+      const calculation = party.headcount && party.costPerHead 
+        ? (party.headcount * party.costPerHead * 0.01).toFixed(2) 
+        : '0.00';
+      
+      html += '<div class="tip-party-row">';
+      html += '  <div class="tip-party-input">';
+      html += '    <label>Headcount</label>';
+      html += '    <input type="number" class="party-headcount" data-index="' + index + '" value="' + (party.headcount || '') + '" placeholder="0" inputmode="numeric" />';
+      html += '  </div>';
+      html += '  <div class="tip-party-input">';
+      html += '    <label>$/Head</label>';
+      html += '    <input type="number" step="0.01" class="party-cost" data-index="' + index + '" value="' + (party.costPerHead || DEFAULT_COST_PER_HEAD) + '" placeholder="65" inputmode="decimal" />';
+      html += '  </div>';
+      html += '  <button class="tip-party-remove" data-index="' + index + '">×</button>';
+      html += '</div>';
+      html += '<div class="tip-party-calc">' + (party.headcount || 0) + ' × $' + (party.costPerHead || DEFAULT_COST_PER_HEAD) + ' × 1% = $' + calculation + '</div>';
+    });
+    
+    partyContainer.innerHTML = html;
+    
+    // Attach event listeners to new inputs
+    document.querySelectorAll('.party-headcount').forEach(function(input) {
+      input.addEventListener('input', function() {
+        const idx = parseInt(this.getAttribute('data-index'));
+        largeParties[idx].headcount = parseFloat(this.value) || 0;
+        calculate();
+        renderParties();
+      });
+    });
+    
+    document.querySelectorAll('.party-cost').forEach(function(input) {
+      input.addEventListener('input', function() {
+        const idx = parseInt(this.getAttribute('data-index'));
+        largeParties[idx].costPerHead = parseFloat(this.value) || DEFAULT_COST_PER_HEAD;
+        calculate();
+        renderParties();
+      });
+    });
+    
+    document.querySelectorAll('.tip-party-remove').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.getAttribute('data-index'));
+        largeParties.splice(idx, 1);
+        calculate();
+        renderParties();
+      });
+    });
+  }
+
+  function addParty() {
+    largeParties.push({ headcount: 0, costPerHead: DEFAULT_COST_PER_HEAD });
+    renderParties();
+    // Focus on the new headcount input
+    setTimeout(function() {
+      const inputs = document.querySelectorAll('.party-headcount');
+      if (inputs.length > 0) {
+        inputs[inputs.length - 1].focus();
+      }
+    }, 50);
+  }
+
+  addPartyBtn.addEventListener('click', addParty);
 
   function validateInput(input) {
     const value = parseFloat(input.value);
@@ -579,12 +748,18 @@ function initTipCalc() {
     const s = parseFloat(sales.value) || 0;
     const bohP = (parseFloat(bohPercent.value) || 0) / 100;
     const fohP = (parseFloat(fohPercent.value) || 0) / 100;
-    const lp = parseFloat(largeParty.value) || 0;
     const c = parseFloat(cash.value) || 0;
+
+    // Calculate total large party deduction
+    let largePartyTip = 0;
+    largeParties.forEach(function(party) {
+      if (party.headcount && party.costPerHead) {
+        largePartyTip += (party.headcount * party.costPerHead * 0.01);
+      }
+    });
 
     const boh = s * bohP;
     const foh = s * fohP;
-    const largePartyTip = lp * 0.01;
     const tips = o - (boh + foh) - largePartyTip + c;
 
     currentTipValue = tips;
@@ -674,6 +849,9 @@ function initTipCalc() {
     sales.value = '';
     bohPercent.value = '';
     fohPercent.value = '';
+    cash.value = '';
+    largeParties = [];
+    renderParties();
     loadPreset();
   });
 
@@ -721,7 +899,7 @@ function initTipCalc() {
   pigDisplay.textContent = pigs[Math.floor(Math.random() * pigs.length)] + 
                           money[Math.floor(Math.random() * money.length)];
 
-  [owed, sales, bohPercent, fohPercent, largeParty, cash].forEach(function(el) {
+  [owed, sales, bohPercent, fohPercent, cash].forEach(function(el) {
     el.addEventListener("input", calculate);
   });
 
@@ -745,6 +923,7 @@ function initTipCalc() {
   });
 
   loadPreset();
+  renderParties(); // Initialize party container
 }
 
 // ============================================

@@ -1,6 +1,6 @@
 {
-  "name": "End of Shift Testing",
-  "short_name": "EoS Testing",
+  "name": "End of Shift Tools",
+  "short_name": "EoS Tools",
   "description": "Calculators to speed up your end of shift",
   "start_url": "./index.html",
   "scope": "./",

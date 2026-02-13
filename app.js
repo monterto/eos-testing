@@ -201,15 +201,19 @@ function getTipCalcHTML() {
   </div>
 
   <div class="tip-secondary">
-    <div class="tip-field">
-      <label>BoH %</label>
-      <input id="bohPercent" type="number" step="0.01" inputmode="decimal" />
+    <div class="tip-percent-display">
+      <div class="tip-percent-display-field">
+        <label>BoH %</label>
+        <div class="tip-percent-display-value" id="bohPercentDisplay">5%</div>
+      </div>
     </div>
-    <div class="tip-field">
-      <label>FoH %</label>
-      <input id="fohPercent" type="number" step="0.01" inputmode="decimal" />
+    <div class="tip-percent-display">
+      <div class="tip-percent-display-field">
+        <label>FoH %</label>
+        <div class="tip-percent-display-value" id="fohPercentDisplay">3%</div>
+      </div>
     </div>
-    <button class="tip-icon-btn" id="savePreset" title="Save Preset">💾</button>
+    <button class="tip-icon-btn" id="openPercentModalBtn" title="Edit Percentages">📝</button>
   </div>
 
   <div class="tip-warning" id="warningBox">
@@ -255,6 +259,29 @@ function getTipCalcHTML() {
   </div>
 </div>
 
+<div class="tip-party-modal" id="percentModal">
+  <div class="tip-party-modal-content">
+    <div class="tip-party-modal-header">
+      <span class="tip-party-modal-title">Percentage Configuration</span>
+      <button class="tip-party-modal-close" id="closePercentModalBtn">Cancel</button>
+    </div>
+    <div class="tip-percent-edit-section">
+      <div class="tip-percent-edit-field">
+        <label>Back of House %</label>
+        <input type="number" id="bohPercentEdit" step="0.01" placeholder="5" inputmode="decimal" />
+      </div>
+      <div class="tip-percent-edit-field">
+        <label>Front of House Support %</label>
+        <input type="number" id="fohPercentEdit" step="0.01" placeholder="3" inputmode="decimal" />
+      </div>
+      <div class="tip-percent-actions">
+        <button class="tip-percent-reset" id="resetPercentsBtn">Reset to Defaults</button>
+        <button class="tip-percent-save" id="savePercentsBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app-info-modal" id="tipCalcInfoModal">
   <div class="app-info-content">
     <div class="app-info-header">
@@ -266,15 +293,16 @@ function getTipCalcHTML() {
       <li><strong>Total Net Sales</strong> - Your total net sales for the shift</li>
       <li><strong>Large Party</strong> - Click 📝 to configure parties. Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
       <li><strong>Cash</strong> - Cash tips received (added to your final tips)</li>
-      <li><strong>BoH %</strong> - Percentage of sales going to Back of House staff</li>
-      <li><strong>FoH %</strong> - Percentage of sales going to Support staff</li>
-      <li><strong>Save Button (💾)</strong> - Saves BoH% and FoH%</li>
+      <li><strong>BoH %</strong> - Percentage of sales going to Back of House staff (click 📝 to edit)</li>
+      <li><strong>FoH %</strong> - Percentage of sales going to Support staff (click 📝 to edit)</li>
+      <li><strong>Edit Button (📝)</strong> - Opens editor to safely change BoH% and FoH%. Changes require explicit confirmation.</li>
+      <li><strong>Reset to Defaults</strong> - In the percentage editor, resets BoH to 5% and FoH to 3% (requires confirmation)</li>
       <li><strong>BoH (output)</strong> - Calculated amount going to Back of House</li>
       <li><strong>FoH (output)</strong> - Calculated amount going to Support</li>
       <li><strong>Tips (output)</strong> - Final tips to the tip pool</li>
     </ul>
     <div class="app-info-formula">
-      <strong>Formula:</strong> Tips = Owed - BoH - FoH - (Large Party × 1%) + Cash
+      <strong>Formula:</strong> Tips = Owed - BoH - FoH - (Large Party) + Cash
     </div>
   </div>
 </div>`;
@@ -287,8 +315,6 @@ function initTipCalc() {
 
   const owed = document.getElementById("owed");
   const sales = document.getElementById("sales");
-  const bohPercent = document.getElementById("bohPercent");
-  const fohPercent = document.getElementById("fohPercent");
   const cash = document.getElementById("cash");
   const bohEl = document.getElementById("boh");
   const fohEl = document.getElementById("foh");
@@ -296,7 +322,6 @@ function initTipCalc() {
   const tipsOutput = document.getElementById("tipsOutput");
   const warningBox = document.getElementById("warningBox");
   const pigDisplay = document.getElementById("pigDisplay");
-  const savePresetBtn = document.getElementById("savePreset");
   const clearBtn = document.getElementById("clearBtn");
   const partyContainer = document.getElementById("partyContainer");
   const addPartyBtn = document.getElementById("addPartyBtn");
@@ -304,14 +329,25 @@ function initTipCalc() {
   const openPartyModalBtn = document.getElementById("openPartyModalBtn");
   const partyModal = document.getElementById("partyModal");
   const closePartyModalBtn = document.getElementById("closePartyModalBtn");
+  
+  // Percent modal elements
+  const bohPercentDisplay = document.getElementById("bohPercentDisplay");
+  const fohPercentDisplay = document.getElementById("fohPercentDisplay");
+  const openPercentModalBtn = document.getElementById("openPercentModalBtn");
+  const percentModal = document.getElementById("percentModal");
+  const closePercentModalBtn = document.getElementById("closePercentModalBtn");
+  const bohPercentEdit = document.getElementById("bohPercentEdit");
+  const fohPercentEdit = document.getElementById("fohPercentEdit");
+  const savePercentsBtn = document.getElementById("savePercentsBtn");
+  const resetPercentsBtn = document.getElementById("resetPercentsBtn");
 
   const round2 = n => Math.round(n * 100) / 100;
   const usd = n => "$" + round2(n).toFixed(2);
 
   let currentTipValue = 0;
-  let previousBohValue = '';
-  let previousFohValue = '';
   let largeParties = [];
+  let bohPercent = DEFAULT_BOH;
+  let fohPercent = DEFAULT_FOH;
 
   function renderParties() {
     let html = '';
@@ -403,6 +439,74 @@ function initTipCalc() {
     }
   });
 
+  // Percent modal controls
+  openPercentModalBtn.addEventListener('click', function() {
+    // Load current values into edit fields
+    bohPercentEdit.value = bohPercent;
+    fohPercentEdit.value = fohPercent;
+    percentModal.classList.add('show');
+  });
+
+  closePercentModalBtn.addEventListener('click', function() {
+    percentModal.classList.remove('show');
+  });
+
+  percentModal.addEventListener('click', function(e) {
+    if (e.target === percentModal) {
+      percentModal.classList.remove('show');
+    }
+  });
+
+  savePercentsBtn.addEventListener('click', function() {
+    const newBoh = parseFloat(bohPercentEdit.value);
+    const newFoh = parseFloat(fohPercentEdit.value);
+    
+    if (isNaN(newBoh) || isNaN(newFoh) || newBoh < 0 || newFoh < 0) {
+      alert('Please enter valid percentages (0 or greater).');
+      return;
+    }
+    
+    const confirmed = confirm('Save Back of House to ' + newBoh + '% and Support to ' + newFoh + '%?');
+    if (!confirmed) return;
+    
+    bohPercent = newBoh;
+    fohPercent = newFoh;
+    
+    // Update displays
+    bohPercentDisplay.textContent = bohPercent + '%';
+    fohPercentDisplay.textContent = fohPercent + '%';
+    
+    // Save to localStorage
+    localStorage.setItem('tipCalcPreset', JSON.stringify({
+      boh: bohPercent,
+      foh: fohPercent
+    }));
+    
+    calculate();
+    percentModal.classList.remove('show');
+  });
+
+  resetPercentsBtn.addEventListener('click', function() {
+    const confirmed = confirm('Reset Back of House to ' + DEFAULT_BOH + '% and Support to ' + DEFAULT_FOH + '%?');
+    if (!confirmed) return;
+    
+    bohPercent = DEFAULT_BOH;
+    fohPercent = DEFAULT_FOH;
+    
+    bohPercentEdit.value = bohPercent;
+    fohPercentEdit.value = fohPercent;
+    bohPercentDisplay.textContent = bohPercent + '%';
+    fohPercentDisplay.textContent = fohPercent + '%';
+    
+    // Save to localStorage
+    localStorage.setItem('tipCalcPreset', JSON.stringify({
+      boh: bohPercent,
+      foh: fohPercent
+    }));
+    
+    calculate();
+  });
+
   function validateInput(input) {
     const value = parseFloat(input.value);
     if (input.value && (isNaN(value) || value < 0)) {
@@ -417,17 +521,15 @@ function initTipCalc() {
   function calculate() {
     const validInputs = [
       validateInput(owed),
-      validateInput(sales),
-      validateInput(bohPercent),
-      validateInput(fohPercent)
+      validateInput(sales)
     ].every(v => v);
 
     if (!validInputs) return;
 
     const o = parseFloat(owed.value) || 0;
     const s = parseFloat(sales.value) || 0;
-    const bohP = (parseFloat(bohPercent.value) || 0) / 100;
-    const fohP = (parseFloat(fohPercent.value) || 0) / 100;
+    const bohP = bohPercent / 100;
+    const fohP = fohPercent / 100;
     const c = parseFloat(cash.value) || 0;
 
     // Calculate total large party deduction
@@ -461,74 +563,20 @@ function initTipCalc() {
     const saved = localStorage.getItem('tipCalcPreset');
     if (saved) {
       const preset = JSON.parse(saved);
-      bohPercent.value = preset.boh;
-      fohPercent.value = preset.foh;
+      bohPercent = preset.boh;
+      fohPercent = preset.foh;
     } else {
-      bohPercent.value = DEFAULT_BOH;
-      fohPercent.value = DEFAULT_FOH;
+      bohPercent = DEFAULT_BOH;
+      fohPercent = DEFAULT_FOH;
     }
-    previousBohValue = bohPercent.value;
-    previousFohValue = fohPercent.value;
+    bohPercentDisplay.textContent = bohPercent + '%';
+    fohPercentDisplay.textContent = fohPercent + '%';
     calculate();
   }
-
-  // Confirmation for BoH% changes
-  bohPercent.addEventListener('focus', function() {
-    previousBohValue = this.value;
-  });
-
-  bohPercent.addEventListener('blur', function() {
-    if (this.value !== previousBohValue && this.value !== '') {
-      const confirmed = confirm('Change Back of House percentage to ' + this.value + '%?');
-      if (!confirmed) {
-        this.value = previousBohValue;
-      } else {
-        previousBohValue = this.value;
-      }
-      calculate();
-    }
-  });
-
-  // Confirmation for FoH% changes
-  fohPercent.addEventListener('focus', function() {
-    previousFohValue = this.value;
-  });
-
-  fohPercent.addEventListener('blur', function() {
-    if (this.value !== previousFohValue && this.value !== '') {
-      const confirmed = confirm('Change Support percentage to ' + this.value + '%?');
-      if (!confirmed) {
-        this.value = previousFohValue;
-      } else {
-        previousFohValue = this.value;
-      }
-      calculate();
-    }
-  });
-
-  savePresetBtn.addEventListener('click', function() {
-    const bohVal = parseFloat(bohPercent.value) || 0;
-    const fohVal = parseFloat(fohPercent.value) || 0;
-    
-    if (bohVal >= 0 && fohVal >= 0) {
-      localStorage.setItem('tipCalcPreset', JSON.stringify({
-        boh: bohVal,
-        foh: fohVal
-      }));
-      savePresetBtn.textContent = '✓';
-      savePresetBtn.classList.add('saved');
-      setTimeout(function() {
-        savePresetBtn.textContent = '💾';
-        savePresetBtn.classList.remove('saved');
-      }, 1500);
-    }
-  });
 
   clearBtn.addEventListener('click', function() {
     owed.value = '';
     sales.value = '';
-    bohPercent.value = '';
-    fohPercent.value = '';
     cash.value = '';
     largeParties = [];
     renderParties();
@@ -579,7 +627,7 @@ function initTipCalc() {
   pigDisplay.textContent = pigs[Math.floor(Math.random() * pigs.length)] + 
                           money[Math.floor(Math.random() * money.length)];
 
-  [owed, sales, bohPercent, fohPercent, cash].forEach(function(el) {
+  [owed, sales, cash].forEach(function(el) {
     el.addEventListener("input", calculate);
   });
 
@@ -605,54 +653,6 @@ function initTipCalc() {
   loadPreset();
   renderParties(); // Initialize party container
 }
-
-// ============================================
-// HOURS CALCULATOR
-// ============================================
-
-function getHoursCalcHTML() {
-  return `
-<div class="hours-app">
-  <div class="hours-field primary">
-    <label>Start Time</label>
-    <input id="start" type="time" />
-  </div>
-
-  <div class="hours-field primary">
-    <label>End Time</label>
-    <input id="end" type="time" />
-  </div>
-
-  <div class="hours-field secondary">
-    <label>Break Time (minutes)</label>
-    <input id="breakTime" type="number" min="0" step="1" placeholder="0" value="0" />
-  </div>
-
-  <div class="hours-field deemphasized">
-    <label>Exact Time Elapsed</label>
-    <div class="hours-output">
-      <strong id="exactTime">0h 0m</strong>
-    </div>
-  </div>
-
-  <div class="hours-field deemphasized">
-    <label>Time After Break</label>
-    <div class="hours-output">
-      <strong id="afterBreak">0h 0m</strong>
-    </div>
-  </div>
-
-  <div class="hours-field emphasized">
-    <label>Rounded Time</label>
-    <div class="hours-output">
-      <strong id="roundedTime">0.00h</strong>
-    </div>
-  </div>
-
-  <button class="hours-save-btn" id="saveHoursToEndOfDay">
-    → Send to End of Day
-  </button>
-
   <div class="hours-bounce" id="emojiDisplay"></div>
 </div>
 

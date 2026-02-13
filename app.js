@@ -653,6 +653,54 @@ function initTipCalc() {
   loadPreset();
   renderParties(); // Initialize party container
 }
+
+// ============================================
+// HOURS CALCULATOR
+// ============================================
+
+function getHoursCalcHTML() {
+  return `
+<div class="hours-app">
+  <div class="hours-field primary">
+    <label>Start Time</label>
+    <input id="start" type="time" />
+  </div>
+
+  <div class="hours-field primary">
+    <label>End Time</label>
+    <input id="end" type="time" />
+  </div>
+
+  <div class="hours-field secondary">
+    <label>Break Time (minutes)</label>
+    <input id="breakTime" type="number" min="0" step="1" placeholder="0" value="0" />
+  </div>
+
+  <div class="hours-field deemphasized">
+    <label>Exact Time Elapsed</label>
+    <div class="hours-output">
+      <strong id="exactTime">0h 0m</strong>
+    </div>
+  </div>
+
+  <div class="hours-field deemphasized">
+    <label>Time After Break</label>
+    <div class="hours-output">
+      <strong id="afterBreak">0h 0m</strong>
+    </div>
+  </div>
+
+  <div class="hours-field emphasized">
+    <label>Rounded Time</label>
+    <div class="hours-output">
+      <strong id="roundedTime">0.00h</strong>
+    </div>
+  </div>
+
+  <button class="hours-save-btn" id="saveHoursToEndOfDay">
+    → Send to End of Day
+  </button>
+
   <div class="hours-bounce" id="emojiDisplay"></div>
 </div>
 
@@ -673,7 +721,6 @@ function initTipCalc() {
   </div>
 </div>`;
 }
-
 function initHoursCalc() {
   const pigEmojis = ["🐽", "🐖", "🐷"];
   const clockEmojis = ["⏰", "🕐", "⏳"];

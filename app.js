@@ -265,7 +265,7 @@ function getTipCalcHTML() {
   }
   
   .tip-party-display-value {
-    background-color: #0c0e13;
+    background-color: rgba(12, 14, 19, 0.5);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.5rem;
@@ -273,6 +273,9 @@ function getTipCalcHTML() {
     color: var(--text);
     font-weight: 500;
     text-align: left;
+    opacity: 0.8;
+    cursor: default;
+    user-select: none;
   }
   
   .tip-party-edit-btn {
@@ -348,16 +351,18 @@ function getTipCalcHTML() {
     background-color: transparent;
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 0.3rem 0.6rem;
+    padding: 0.4rem 1rem;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
     transition: all 0.2s;
   }
   
   .tip-party-modal-close:hover {
-    border-color: var(--warning);
-    color: var(--warning);
+    border-color: var(--accent);
+    color: var(--accent);
+    background-color: rgba(77, 163, 255, 0.1);
   }
   
   .tip-party-section {
@@ -668,10 +673,10 @@ function getTipCalcHTML() {
   <div class="tip-advanced">
     <div class="tip-party-display">
       <div class="tip-party-display-field">
-        <label>Large Party (1%)</label>
+        <label>Large Party</label>
         <div class="tip-party-display-value" id="partyDisplayValue">$0.00</div>
       </div>
-      <button class="tip-party-edit-btn" id="openPartyModalBtn" title="Configure Large Parties">⚙️</button>
+      <button class="tip-party-edit-btn" id="openPartyModalBtn" title="Configure Large Parties">📝</button>
     </div>
     <div class="tip-field">
       <label>Cash</label>
@@ -725,7 +730,7 @@ function getTipCalcHTML() {
   <div class="tip-party-modal-content">
     <div class="tip-party-modal-header">
       <span class="tip-party-modal-title">Large Party Configuration</span>
-      <button class="tip-party-modal-close" id="closePartyModalBtn">✕</button>
+      <button class="tip-party-modal-close" id="closePartyModalBtn">Done</button>
     </div>
     <div class="tip-party-section">
       <div id="partyContainer"></div>
@@ -743,7 +748,7 @@ function getTipCalcHTML() {
     <ul class="app-info-list">
       <li><strong>Owed</strong> - Total tips owed to you from the POS system</li>
       <li><strong>Total Net Sales</strong> - Your total net sales for the shift</li>
-      <li><strong>Large Party (1%)</strong> - Click ⚙️ to configure parties. Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
+      <li><strong>Large Party</strong> - Click 📝 to configure parties. Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
       <li><strong>Cash</strong> - Cash tips received (added to your final tips)</li>
       <li><strong>BoH %</strong> - Percentage of sales going to Back of House staff</li>
       <li><strong>FoH %</strong> - Percentage of sales going to Support staff</li>

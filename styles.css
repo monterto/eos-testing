@@ -1689,107 +1689,8 @@ body {
     }
   }
 
-  /* Paired Entry Styles */
-  .eod-paired-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .eod-paired-entry {
-    background-color: rgba(77, 163, 255, 0.05);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.75rem;
-    transition: all 0.2s;
-  }
-
-  .eod-paired-entry:hover {
-    border-color: rgba(77, 163, 255, 0.3);
-    background-color: rgba(77, 163, 255, 0.08);
-  }
-
-  .eod-paired-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .eod-paired-number {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--accent);
-  }
-
-  .eod-reorder-btns {
-    display: flex;
-    gap: 0.2rem;
-  }
-
-  .eod-reorder-btn {
-    width: 24px;
-    height: 24px;
-    background-color: rgba(12, 14, 19, 0.5);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 0.8rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    opacity: 0.7;
-    transition: all 0.2s;
-  }
-
-  .eod-reorder-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background-color: rgba(77, 163, 255, 0.1);
-    opacity: 1;
-  }
-
-  .eod-paired-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  .eod-paired-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-
-  .eod-paired-field label {
-    font-size: 0.7rem;
-    color: var(--muted);
-    font-weight: 500;
-    opacity: 0.7;
-  }
-
-  .eod-paired-value-row {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-
-  .eod-paired-value {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .eod-paired-value.empty {
-    opacity: 0.3;
-    font-weight: 400;
-  }
-
-  .eod-auto-badge {
+  /* Sent Badge Style */
+  .eod-sent-badge {
     font-size: 0.65rem;
     color: var(--accent);
     background-color: rgba(77, 163, 255, 0.15);
@@ -1799,33 +1700,7 @@ body {
     display: inline-block;
     font-weight: 500;
     opacity: 0.8;
-  }
-
-  .eod-paired-actions {
-    display: flex;
-    gap: 0.3rem;
-    margin-top: 0.2rem;
-  }
-
-  @media (max-width: 400px) {
-    .eod-paired-entry {
-      padding: 0.5rem;
-    }
-
-    .eod-paired-fields {
-      gap: 0.4rem;
-    }
-
-    .eod-reorder-btn {
-      width: 22px;
-      height: 22px;
-      font-size: 0.75rem;
-    }
-
-    .eod-auto-badge {
-      font-size: 0.6rem;
-      padding: 0.08rem 0.25rem;
-    }
+    margin-left: 0.3rem;
   }
 
 /* ============================================ */

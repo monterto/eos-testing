@@ -855,8 +855,6 @@ function initHoursCalc() {
 // END OF DAY CALCULATOR
 // ============================================
 
-// Modified End of Day functions
-
 function getEndOfDayHTML() {
   return `
 <div class="eod-app">
@@ -908,11 +906,21 @@ function getEndOfDayHTML() {
   
   <div class="eod-section">
     <div class="eod-section-header">
-      <span class="eod-section-title">Shift Entries</span>
-      <span class="eod-count" id="entriesCount">0 entries</span>
+      <span class="eod-section-title">Hours Entries</span>
+      <span class="eod-count" id="hoursCount">0 entries</span>
     </div>
-    <div class="eod-paired-list" id="pairedList">
-      <div class="eod-empty">No entries added yet</div>
+    <div class="eod-list" id="hoursList">
+      <div class="eod-empty">No hours added yet</div>
+    </div>
+  </div>
+  
+  <div class="eod-section">
+    <div class="eod-section-header">
+      <span class="eod-section-title">Tips Entries</span>
+      <span class="eod-count" id="tipsCount">0 entries</span>
+    </div>
+    <div class="eod-list" id="tipsList">
+      <div class="eod-empty">No tips added yet</div>
     </div>
   </div>
   
@@ -932,13 +940,14 @@ function getEndOfDayHTML() {
       <button class="app-info-close" id="closeEodInfoBtn">✕</button>
     </div>
     <ul class="app-info-list">
-      <li><strong>Add Hours Worked</strong> - Enter rounded hours (auto-sent from Hours Calculator)</li>
-      <li><strong>Add Tips Earned</strong> - Enter final tips (auto-sent from Tip Calculator)</li>
+      <li><strong>Add Hours Worked</strong> - Enter rounded hours</li>
+      <li><strong>Add Tips Earned</strong> - Enter final tips for the tip pool</li>
       <li><strong>Total Hours</strong> - Sum of all hours entries across shifts</li>
       <li><strong>Total Tips</strong> - Sum of all tips entries</li>
       <li><strong>Hourly Rate</strong> - Average earnings per hour (Total Tips ÷ Total Hours)</li>
-      <li><strong>Shift Entries</strong> - Paired hours and tips records. Use ↑↓ buttons to reorder.</li>
-      <li><strong>Auto Badge</strong> - Indicates value was sent from another calculator</li>
+      <li><strong>View Tips Breakdown</strong> - Shows calculated total tips based on the hourly rate</li>
+      <li><strong>Hours/Tips Entries</strong> - Individual shift records (can edit or delete)</li>
+      <li><strong>→Sent Label</strong> - Indicates value was sent from Hours Calculator or Tip Calculator</li>
     </ul>
   </div>
 </div>`;
@@ -964,7 +973,7 @@ function initEndOfDay() {
       totalHours = data.totalHours || 0;
       totalTips = data.totalTips || 0;
       
-      // Migrate old format to new format with auto tracking
+      // Support new format with auto tracking
       if (data.hoursEntries && data.hoursEntries.length > 0) {
         if (typeof data.hoursEntries[0] === 'number') {
           // Old format - convert to new
@@ -1016,11 +1025,13 @@ function initEndOfDay() {
     const hourlyRate = totalHours > 0 ? totalTips / totalHours : 0;
     document.getElementById('hourlyRate').textContent = "$" + hourlyRate.toFixed(2);
     
-    const maxEntries = Math.max(hoursEntries.length, tipsEntries.length);
-    document.getElementById('entriesCount').textContent = 
-      maxEntries + " " + (maxEntries === 1 ? 'entry' : 'entries');
+    document.getElementById('hoursCount').textContent = 
+      hoursEntries.length + " " + (hoursEntries.length === 1 ? 'entry' : 'entries');
+    document.getElementById('tipsCount').textContent = 
+      tipsEntries.length + " " + (tipsEntries.length === 1 ? 'entry' : 'entries');
     
-    renderPairedList();
+    renderHoursList();
+    renderTipsList();
     
     const undoBtn = document.getElementById('undoBtn');
     if (lastDeletedItem) {
@@ -1037,80 +1048,35 @@ function initEndOfDay() {
     }
   }
 
-  function renderPairedList() {
-    const listEl = document.getElementById('pairedList');
-    const maxEntries = Math.max(hoursEntries.length, tipsEntries.length);
-    
-    if (maxEntries === 0) {
-      listEl.innerHTML = '<div class="eod-empty">No entries added yet</div>';
+  function renderHoursList() {
+    const listEl = document.getElementById('hoursList');
+    if (hoursEntries.length === 0) {
+      listEl.innerHTML = '<div class="eod-empty">No hours added yet</div>';
       return;
     }
     
     var html = '';
-    for (var i = 0; i < maxEntries; i++) {
-      const hoursEntry = hoursEntries[i];
-      const tipsEntry = tipsEntries[i];
+    for (var i = 0; i < hoursEntries.length; i++) {
+      const entry = hoursEntries[i];
+      const value = entry.value || entry;
+      const isAuto = entry.auto || false;
       
-      html += '<div class="eod-paired-entry" data-index="' + i + '">';
-      html += '  <div class="eod-paired-header">';
-      html += '    <span class="eod-paired-number">Entry ' + (i + 1) + '</span>';
-      html += '    <div class="eod-reorder-btns">';
-      if (i > 0) {
-        html += '      <button class="eod-reorder-btn" data-index="' + i + '" data-direction="up" title="Move up">↑</button>';
+      html += '<div class="eod-list-item">';
+      html += '<div>';
+      html += '<span class="eod-item-label">Entry ' + (i + 1) + '</span> ';
+      html += '<span class="eod-item-value">' + (typeof value === 'number' ? value.toFixed(2) : parseFloat(value).toFixed(2)) + 'h</span>';
+      if (isAuto) {
+        html += ' <span class="eod-sent-badge">→Sent</span>';
       }
-      if (i < maxEntries - 1) {
-        html += '      <button class="eod-reorder-btn" data-index="' + i + '" data-direction="down" title="Move down">↓</button>';
-      }
-      html += '    </div>';
-      html += '  </div>';
-      
-      html += '  <div class="eod-paired-fields">';
-      
-      // Hours field
-      html += '    <div class="eod-paired-field">';
-      html += '      <label>Hours</label>';
-      html += '      <div class="eod-paired-value-row">';
-      if (hoursEntry) {
-        html += '        <span class="eod-paired-value">' + hoursEntry.value.toFixed(2) + 'h</span>';
-        if (hoursEntry.auto) {
-          html += '        <span class="eod-auto-badge">auto</span>';
-        }
-        html += '        <div class="eod-paired-actions">';
-        html += '          <button class="eod-item-btn" data-index="' + i + '" data-type="hours-edit">Edit</button>';
-        html += '          <button class="eod-item-btn delete" data-index="' + i + '" data-type="hours-delete">×</button>';
-        html += '        </div>';
-      } else {
-        html += '        <span class="eod-paired-value empty">--</span>';
-      }
-      html += '      </div>';
-      html += '    </div>';
-      
-      // Tips field
-      html += '    <div class="eod-paired-field">';
-      html += '      <label>Tips</label>';
-      html += '      <div class="eod-paired-value-row">';
-      if (tipsEntry) {
-        html += '        <span class="eod-paired-value">$' + tipsEntry.value.toFixed(2) + '</span>';
-        if (tipsEntry.auto) {
-          html += '        <span class="eod-auto-badge">auto</span>';
-        }
-        html += '        <div class="eod-paired-actions">';
-        html += '          <button class="eod-item-btn" data-index="' + i + '" data-type="tips-edit">Edit</button>';
-        html += '          <button class="eod-item-btn delete" data-index="' + i + '" data-type="tips-delete">×</button>';
-        html += '        </div>';
-      } else {
-        html += '        <span class="eod-paired-value empty">--</span>';
-      }
-      html += '      </div>';
-      html += '    </div>';
-      
-      html += '  </div>';
+      html += '</div>';
+      html += '<div class="eod-item-actions">';
+      html += '<button class="eod-item-btn" data-index="' + i + '" data-type="hours-edit">Edit</button>';
+      html += '<button class="eod-item-btn delete" data-index="' + i + '" data-type="hours-delete">×</button>';
+      html += '</div>';
       html += '</div>';
     }
-    
     listEl.innerHTML = html;
     
-    // Attach event listeners
     listEl.querySelectorAll('[data-type="hours-edit"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
         editHoursEntry(parseInt(this.getAttribute('data-index')));
@@ -1122,6 +1088,36 @@ function initEndOfDay() {
         deleteHoursEntry(parseInt(this.getAttribute('data-index')));
       });
     });
+  }
+
+  function renderTipsList() {
+    const listEl = document.getElementById('tipsList');
+    if (tipsEntries.length === 0) {
+      listEl.innerHTML = '<div class="eod-empty">No tips added yet</div>';
+      return;
+    }
+    
+    var html = '';
+    for (var i = 0; i < tipsEntries.length; i++) {
+      const entry = tipsEntries[i];
+      const value = entry.value || entry;
+      const isAuto = entry.auto || false;
+      
+      html += '<div class="eod-list-item">';
+      html += '<div>';
+      html += '<span class="eod-item-label">Entry ' + (i + 1) + '</span> ';
+      html += '<span class="eod-item-value">$' + (typeof value === 'number' ? value.toFixed(2) : parseFloat(value).toFixed(2)) + '</span>';
+      if (isAuto) {
+        html += ' <span class="eod-sent-badge">→Sent</span>';
+      }
+      html += '</div>';
+      html += '<div class="eod-item-actions">';
+      html += '<button class="eod-item-btn" data-index="' + i + '" data-type="tips-edit">Edit</button>';
+      html += '<button class="eod-item-btn delete" data-index="' + i + '" data-type="tips-delete">×</button>';
+      html += '</div>';
+      html += '</div>';
+    }
+    listEl.innerHTML = html;
     
     listEl.querySelectorAll('[data-type="tips-edit"]').forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -1134,44 +1130,6 @@ function initEndOfDay() {
         deleteTipsEntry(parseInt(this.getAttribute('data-index')));
       });
     });
-    
-    listEl.querySelectorAll('.eod-reorder-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        const index = parseInt(this.getAttribute('data-index'));
-        const direction = this.getAttribute('data-direction');
-        reorderEntry(index, direction);
-      });
-    });
-  }
-
-  function reorderEntry(index, direction) {
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    const maxEntries = Math.max(hoursEntries.length, tipsEntries.length);
-    
-    if (newIndex < 0 || newIndex >= maxEntries) return;
-    
-    // Swap hours entries if they exist
-    if (hoursEntries[index] || hoursEntries[newIndex]) {
-      const temp = hoursEntries[index] || null;
-      hoursEntries[index] = hoursEntries[newIndex] || null;
-      hoursEntries[newIndex] = temp;
-      
-      // Clean up nulls at the end
-      hoursEntries = hoursEntries.filter(function(entry) { return entry !== null; });
-    }
-    
-    // Swap tips entries if they exist
-    if (tipsEntries[index] || tipsEntries[newIndex]) {
-      const temp = tipsEntries[index] || null;
-      tipsEntries[index] = tipsEntries[newIndex] || null;
-      tipsEntries[newIndex] = temp;
-      
-      // Clean up nulls at the end
-      tipsEntries = tipsEntries.filter(function(entry) { return entry !== null; });
-    }
-    
-    saveData();
-    updateDisplay();
   }
 
   document.getElementById('addHoursBtn').addEventListener('click', function() {
@@ -1225,13 +1183,13 @@ function initEndOfDay() {
 
   function editHoursEntry(index) {
     if (!hoursEntries[index]) return;
-    const currentValue = hoursEntries[index].value;
+    const entry = hoursEntries[index];
+    const currentValue = entry.value || entry;
     const newValue = prompt("Edit hours (Entry " + (index + 1) + "):", currentValue);
     
     if (newValue !== null && !isNaN(newValue) && parseFloat(newValue) > 0) {
       totalHours = totalHours - currentValue + parseFloat(newValue);
-      hoursEntries[index].value = parseFloat(newValue);
-      hoursEntries[index].auto = false; // Clear auto flag on manual edit
+      hoursEntries[index] = {value: parseFloat(newValue), auto: false};
       saveData();
       updateDisplay();
     }
@@ -1239,6 +1197,8 @@ function initEndOfDay() {
 
   function deleteHoursEntry(index) {
     if (!hoursEntries[index]) return;
+    const entry = hoursEntries[index];
+    const value = entry.value || entry;
     
     lastDeletedItem = {
       type: 'hours',
@@ -1246,7 +1206,7 @@ function initEndOfDay() {
       entry: hoursEntries[index]
     };
     
-    totalHours -= hoursEntries[index].value;
+    totalHours -= value;
     hoursEntries.splice(index, 1);
     saveData();
     updateDisplay();
@@ -1254,14 +1214,14 @@ function initEndOfDay() {
 
   function editTipsEntry(index) {
     if (!tipsEntries[index]) return;
-    const currentValue = tipsEntries[index].value;
-    const newValue = prompt("Edit tips (Entry " + (index + 1) + "):", currentValue.toFixed(2));
+    const entry = tipsEntries[index];
+    const currentValue = entry.value || entry;
+    const newValue = prompt("Edit tips (Entry " + (index + 1) + "):", (typeof currentValue === 'number' ? currentValue.toFixed(2) : parseFloat(currentValue).toFixed(2)));
     
     if (newValue !== null && !isNaN(newValue) && parseFloat(newValue) >= 0) {
       const rounded = Math.round(parseFloat(newValue) * 100) / 100;
       totalTips = totalTips - currentValue + rounded;
-      tipsEntries[index].value = rounded;
-      tipsEntries[index].auto = false; // Clear auto flag on manual edit
+      tipsEntries[index] = {value: rounded, auto: false};
       saveData();
       updateDisplay();
     }
@@ -1269,6 +1229,8 @@ function initEndOfDay() {
 
   function deleteTipsEntry(index) {
     if (!tipsEntries[index]) return;
+    const entry = tipsEntries[index];
+    const value = entry.value || entry;
     
     lastDeletedItem = {
       type: 'tips',
@@ -1276,7 +1238,7 @@ function initEndOfDay() {
       entry: tipsEntries[index]
     };
     
-    totalTips -= tipsEntries[index].value;
+    totalTips -= value;
     tipsEntries.splice(index, 1);
     saveData();
     updateDisplay();
@@ -1287,10 +1249,12 @@ function initEndOfDay() {
     
     if (lastDeletedItem.type === 'hours') {
       hoursEntries.splice(lastDeletedItem.index, 0, lastDeletedItem.entry);
-      totalHours += lastDeletedItem.entry.value;
+      const value = lastDeletedItem.entry.value || lastDeletedItem.entry;
+      totalHours += value;
     } else if (lastDeletedItem.type === 'tips') {
       tipsEntries.splice(lastDeletedItem.index, 0, lastDeletedItem.entry);
-      totalTips += lastDeletedItem.entry.value;
+      const value = lastDeletedItem.entry.value || lastDeletedItem.entry;
+      totalTips += value;
     }
     
     lastDeletedItem = null;
@@ -1359,15 +1323,15 @@ function initEndOfDay() {
     var calculatedTotal = 0;
     
     for (var i = 0; i < hoursEntries.length; i++) {
-      if (!hoursEntries[i]) continue;
-      const hours = hoursEntries[i].value;
+      const entry = hoursEntries[i];
+      const hours = entry.value || entry;
       const tipsForEntry = hours * hourlyRate;
       calculatedTotal += tipsForEntry;
       
       html += '<div class="eod-breakdown-item">';
       html += '<div class="eod-breakdown-item-left">';
       html += '<span class="eod-breakdown-item-label">Entry ' + (i + 1) + '</span>';
-      html += '<span class="eod-breakdown-item-calc">' + hours.toFixed(2) + 'h × $' + hourlyRate.toFixed(2) + '/h</span>';
+      html += '<span class="eod-breakdown-item-calc">' + (typeof hours === 'number' ? hours.toFixed(2) : parseFloat(hours).toFixed(2)) + 'h × $' + hourlyRate.toFixed(2) + '/h</span>';
       html += '</div>';
       html += '<span class="eod-breakdown-item-value">$' + tipsForEntry.toFixed(2) + '</span>';
       html += '</div>';

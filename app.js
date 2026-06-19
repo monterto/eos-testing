@@ -5,6 +5,16 @@
 // Debug flag - set to true to enable manual testing of clear data prompt
 const ENABLE_DEBUG_TRIGGER = false;
 
+// Robust rounding to 2 decimal places (cents) that compensates for binary
+// floating-point representation error — e.g. 0.615 * 100 evaluates to
+// 61.49999999999999 in JS, which Math.round() alone would round down to
+// 61 instead of 62. Used anywhere a dollar amount is rounded to the cent.
+function roundToCents(value) {
+  const n = typeof value === 'number' ? value : parseFloat(value);
+  if (isNaN(n)) return 0;
+  return Math.round(n * 100 + (n >= 0 ? 1e-7 : -1e-7)) / 100;
+}
+
 // Randomize hub emoji on load
 document.getElementById('hubEmoji').textContent = "🐖";
 
@@ -194,10 +204,12 @@ function getTipCalcHTML() {
       </div>
       <button class="tip-party-edit-btn" id="openPartyModalBtn" title="Configure Large Parties">📝</button>
     </div>
+    <!--
     <div class="tip-field">
       <label>Cash</label>
       <input id="cash" type="number" step="0.01" placeholder="0.00" inputmode="decimal" />
     </div>
+    -->
   </div>
 
   <div class="tip-secondary">
@@ -292,7 +304,6 @@ function getTipCalcHTML() {
       <li><strong>Owed</strong> - Total tips owed to you from the POS system</li>
       <li><strong>Total Net Sales</strong> - Your total net sales for the shift</li>
       <li><strong>Large Party</strong> - Click 📝 to configure parties. Enter headcount and cost per head; 1% of (headcount × cost per head) is subtracted from tips</li>
-      <li><strong>Cash</strong> - Cash tips received (added to your final tips)</li>
       <li><strong>BoH %</strong> - Percentage of sales going to Back of House staff (click 📝 to edit)</li>
       <li><strong>FoH %</strong> - Percentage of sales going to Support staff (click 📝 to edit)</li>
       <li><strong>Edit Button (📝)</strong> - Opens editor to safely change BoH% and FoH%. Changes require explicit confirmation.</li>
@@ -302,7 +313,7 @@ function getTipCalcHTML() {
       <li><strong>Tips (output)</strong> - Final tips to the tip pool</li>
     </ul>
     <div class="app-info-formula">
-      <strong>Formula:</strong> Tips = Owed - BoH - FoH - (Large Party) + Cash
+      <strong>Formula:</strong> Tips = Owed - BoH - FoH - (Large Party)
     </div>
   </div>
 </div>`;
@@ -530,7 +541,7 @@ function initTipCalc() {
     const s = parseFloat(sales.value) || 0;
     const bohP = bohPercent / 100;
     const fohP = fohPercent / 100;
-    const c = parseFloat(cash.value) || 0;
+    const c = cash ? (parseFloat(cash.value) || 0) : 0;
 
     // Calculate total large party deduction
     let largePartyTip = 0;
@@ -577,7 +588,7 @@ function initTipCalc() {
   clearBtn.addEventListener('click', function() {
     owed.value = '';
     sales.value = '';
-    cash.value = '';
+    if (cash) cash.value = '';
     largeParties = [];
     renderParties();
     loadPreset();
@@ -602,9 +613,9 @@ function initTipCalc() {
         }
       }
       
-      const roundedTip = Math.round(currentTipValue * 100) / 100;
+      const roundedTip = roundToCents(currentTipValue);
       data.tipsEntries.push({value: roundedTip, auto: true});
-      data.totalTips += roundedTip;
+      data.totalTips = data.tipsEntries.reduce(function(sum, e) { return sum + (e.value !== undefined ? e.value : e); }, 0);
       
       localStorage.setItem('endOfDayData', JSON.stringify(data));
       
@@ -627,7 +638,7 @@ function initTipCalc() {
   pigDisplay.textContent = pigs[Math.floor(Math.random() * pigs.length)] + 
                           money[Math.floor(Math.random() * money.length)];
 
-  [owed, sales, cash].forEach(function(el) {
+  [owed, sales, cash].filter(function(el) { return el !== null; }).forEach(function(el) {
     el.addEventListener("input", calculate);
   });
 
@@ -830,7 +841,7 @@ function initHoursCalc() {
       }
       
       data.hoursEntries.push({value: currentRoundedHours, auto: true});
-      data.totalHours += currentRoundedHours;
+      data.totalHours = data.hoursEntries.reduce(function(sum, e) { return sum + (e.value !== undefined ? e.value : e); }, 0);
       
       localStorage.setItem('endOfDayData', JSON.stringify(data));
       
@@ -966,13 +977,26 @@ function initEndOfDay() {
   var tipsEntries = [];
   var lastDeletedItem = null;
 
+  // Always derive totals from entries — never trust stored running totals.
+  // This eliminates floating-point drift from repeated += / -= operations.
+  function recalculateTotals() {
+    totalHours = hoursEntries.reduce(function(sum, e) {
+      const v = e.value !== undefined ? e.value : e;
+      const n = typeof v === 'number' ? v : parseFloat(v);
+      return sum + (isNaN(n) ? 0 : n);
+    }, 0);
+    totalTips = tipsEntries.reduce(function(sum, e) {
+      const v = e.value !== undefined ? e.value : e;
+      const n = typeof v === 'number' ? v : parseFloat(v);
+      return sum + (isNaN(n) ? 0 : n);
+    }, 0);
+  }
+
   function loadData() {
     const saved = localStorage.getItem('endOfDayData');
     if (saved) {
       const data = JSON.parse(saved);
-      totalHours = data.totalHours || 0;
-      totalTips = data.totalTips || 0;
-      
+
       // Support new format with auto tracking
       if (data.hoursEntries && data.hoursEntries.length > 0) {
         if (typeof data.hoursEntries[0] === 'number') {
@@ -984,7 +1008,7 @@ function initEndOfDay() {
           hoursEntries = data.hoursEntries;
         }
       }
-      
+
       if (data.tipsEntries && data.tipsEntries.length > 0) {
         if (typeof data.tipsEntries[0] === 'number') {
           // Old format - convert to new
@@ -995,7 +1019,10 @@ function initEndOfDay() {
           tipsEntries = data.tipsEntries;
         }
       }
-      
+
+      // Recompute from entries rather than trusting the stored running totals,
+      // which can drift due to floating-point arithmetic.
+      recalculateTotals();
       updateDisplay();
     }
   }
@@ -1058,7 +1085,7 @@ function initEndOfDay() {
     var html = '';
     for (var i = 0; i < hoursEntries.length; i++) {
       const entry = hoursEntries[i];
-      const value = entry.value || entry;
+      const value = entry.value !== undefined ? entry.value : entry;
       const isAuto = entry.auto || false;
       
       html += '<div class="eod-list-item">';
@@ -1100,7 +1127,7 @@ function initEndOfDay() {
     var html = '';
     for (var i = 0; i < tipsEntries.length; i++) {
       const entry = tipsEntries[i];
-      const value = entry.value || entry;
+      const value = entry.value !== undefined ? entry.value : entry;
       const isAuto = entry.auto || false;
       
       html += '<div class="eod-list-item">';
@@ -1136,37 +1163,43 @@ function initEndOfDay() {
     const input = document.getElementById('hoursInput');
     const value = parseFloat(input.value);
     
-    if (input.value && !isNaN(value) && value > 0) {
-      hoursEntries.push({value: value, auto: false});
-      totalHours += value;
-      input.value = '';
-      lastDeletedItem = null;
-      saveData();
-      updateDisplay();
-      
-      setTimeout(function() {
-        input.focus();
-      }, 50);
+    if (!input.value || isNaN(value) || value <= 0) {
+      alert('Please enter a valid number of hours greater than 0.');
+      return;
     }
+
+    hoursEntries.push({value: value, auto: false});
+    recalculateTotals();
+    input.value = '';
+    lastDeletedItem = null;
+    saveData();
+    updateDisplay();
+    
+    setTimeout(function() {
+      input.focus();
+    }, 50);
   });
 
   document.getElementById('addTipsBtn').addEventListener('click', function() {
     const input = document.getElementById('tipsInput');
     const value = parseFloat(input.value);
     
-    if (input.value && !isNaN(value) && value >= 0) {
-      const rounded = Math.round(value * 100) / 100;
-      tipsEntries.push({value: rounded, auto: false});
-      totalTips += rounded;
-      input.value = '';
-      lastDeletedItem = null;
-      saveData();
-      updateDisplay();
-      
-      setTimeout(function() {
-        input.focus();
-      }, 50);
+    if (!input.value || isNaN(value) || value < 0) {
+      alert('Please enter a valid tip amount (0 or greater).');
+      return;
     }
+
+    const rounded = roundToCents(value);
+    tipsEntries.push({value: rounded, auto: false});
+    recalculateTotals();
+    input.value = '';
+    lastDeletedItem = null;
+    saveData();
+    updateDisplay();
+    
+    setTimeout(function() {
+      input.focus();
+    }, 50);
   });
 
   document.getElementById('hoursInput').addEventListener('keypress', function(e) {
@@ -1184,30 +1217,34 @@ function initEndOfDay() {
   function editHoursEntry(index) {
     if (!hoursEntries[index]) return;
     const entry = hoursEntries[index];
-    const currentValue = entry.value || entry;
+    const currentValue = entry.value !== undefined ? entry.value : entry;
     const newValue = prompt("Edit hours (Entry " + (index + 1) + "):", currentValue);
     
-    if (newValue !== null && !isNaN(newValue) && parseFloat(newValue) > 0) {
-      totalHours = totalHours - currentValue + parseFloat(newValue);
-      hoursEntries[index] = {value: parseFloat(newValue), auto: false};
-      saveData();
-      updateDisplay();
+    if (newValue === null) return; // user cancelled
+
+    const parsed = parseFloat(newValue);
+    if (isNaN(newValue) || isNaN(parsed) || parsed <= 0) {
+      alert('Please enter a valid number of hours greater than 0. Your original entry was not changed.');
+      return;
     }
+
+    hoursEntries[index] = {value: parsed, auto: false};
+    recalculateTotals();
+    saveData();
+    updateDisplay();
   }
 
   function deleteHoursEntry(index) {
     if (!hoursEntries[index]) return;
-    const entry = hoursEntries[index];
-    const value = entry.value || entry;
-    
+
     lastDeletedItem = {
       type: 'hours',
       index: index,
       entry: hoursEntries[index]
     };
-    
-    totalHours -= value;
+
     hoursEntries.splice(index, 1);
+    recalculateTotals();
     saveData();
     updateDisplay();
   }
@@ -1215,31 +1252,34 @@ function initEndOfDay() {
   function editTipsEntry(index) {
     if (!tipsEntries[index]) return;
     const entry = tipsEntries[index];
-    const currentValue = entry.value || entry;
+    const currentValue = entry.value !== undefined ? entry.value : entry;
     const newValue = prompt("Edit tips (Entry " + (index + 1) + "):", (typeof currentValue === 'number' ? currentValue.toFixed(2) : parseFloat(currentValue).toFixed(2)));
     
-    if (newValue !== null && !isNaN(newValue) && parseFloat(newValue) >= 0) {
-      const rounded = Math.round(parseFloat(newValue) * 100) / 100;
-      totalTips = totalTips - currentValue + rounded;
-      tipsEntries[index] = {value: rounded, auto: false};
-      saveData();
-      updateDisplay();
+    if (newValue === null) return; // user cancelled
+
+    const parsed = parseFloat(newValue);
+    if (isNaN(newValue) || isNaN(parsed) || parsed < 0) {
+      alert('Please enter a valid tip amount (0 or greater). Your original entry was not changed.');
+      return;
     }
+
+    tipsEntries[index] = {value: roundToCents(parsed), auto: false};
+    recalculateTotals();
+    saveData();
+    updateDisplay();
   }
 
   function deleteTipsEntry(index) {
     if (!tipsEntries[index]) return;
-    const entry = tipsEntries[index];
-    const value = entry.value || entry;
-    
+
     lastDeletedItem = {
       type: 'tips',
       index: index,
       entry: tipsEntries[index]
     };
-    
-    totalTips -= value;
+
     tipsEntries.splice(index, 1);
+    recalculateTotals();
     saveData();
     updateDisplay();
   }
@@ -1249,14 +1289,11 @@ function initEndOfDay() {
     
     if (lastDeletedItem.type === 'hours') {
       hoursEntries.splice(lastDeletedItem.index, 0, lastDeletedItem.entry);
-      const value = lastDeletedItem.entry.value || lastDeletedItem.entry;
-      totalHours += value;
     } else if (lastDeletedItem.type === 'tips') {
       tipsEntries.splice(lastDeletedItem.index, 0, lastDeletedItem.entry);
-      const value = lastDeletedItem.entry.value || lastDeletedItem.entry;
-      totalTips += value;
     }
     
+    recalculateTotals();
     lastDeletedItem = null;
     saveData();
     updateDisplay();
@@ -1318,28 +1355,49 @@ function initEndOfDay() {
     
     const hourlyRate = totalHours > 0 ? totalTips / totalHours : 0;
     const breakdownList = document.getElementById('breakdownList');
+
+    // Allocate the total in whole cents using the largest-remainder method.
+    // Rounding each line (hours_i * hourlyRate) independently to the cent
+    // can leave the displayed lines a cent or two short of (or over) the
+    // displayed total — this guarantees they always reconcile exactly.
+    const totalCents = Math.round(totalTips * 100);
+    const hoursValues = hoursEntries.map(function(entry) {
+      return entry.value !== undefined ? entry.value : entry;
+    });
+    const weights = hoursValues.map(function(h) {
+      return totalHours > 0 ? h / totalHours : 0;
+    });
+    const rawCents = weights.map(function(w) { return totalCents * w; });
+    const flooredCents = rawCents.map(Math.floor);
+    let remainder = totalCents - flooredCents.reduce(function(a, b) { return a + b; }, 0);
+    const order = rawCents
+      .map(function(c, i) { return { i: i, frac: c - Math.floor(c) }; })
+      .sort(function(a, b) { return b.frac - a.frac; });
+    const allocatedCents = flooredCents.slice();
+    for (let k = 0; k < remainder; k++) {
+      allocatedCents[order[k].i] += 1;
+    }
     
     var html = '';
-    var calculatedTotal = 0;
+    var calculatedTotalCents = 0;
     
     for (var i = 0; i < hoursEntries.length; i++) {
-      const entry = hoursEntries[i];
-      const hours = entry.value || entry;
-      const tipsForEntry = hours * hourlyRate;
-      calculatedTotal += tipsForEntry;
+      const hours = hoursValues[i];
+      const entryCents = allocatedCents[i];
+      calculatedTotalCents += entryCents;
       
       html += '<div class="eod-breakdown-item">';
       html += '<div class="eod-breakdown-item-left">';
       html += '<span class="eod-breakdown-item-label">Entry ' + (i + 1) + '</span>';
       html += '<span class="eod-breakdown-item-calc">' + (typeof hours === 'number' ? hours.toFixed(2) : parseFloat(hours).toFixed(2)) + 'h × $' + hourlyRate.toFixed(2) + '/h</span>';
       html += '</div>';
-      html += '<span class="eod-breakdown-item-value">$' + tipsForEntry.toFixed(2) + '</span>';
+      html += '<span class="eod-breakdown-item-value">$' + (entryCents / 100).toFixed(2) + '</span>';
       html += '</div>';
     }
     
     html += '<div class="eod-breakdown-total">';
     html += '<span class="eod-breakdown-total-label">Total Calculated</span>';
-    html += '<span class="eod-breakdown-total-value">$' + calculatedTotal.toFixed(2) + '</span>';
+    html += '<span class="eod-breakdown-total-value">$' + (calculatedTotalCents / 100).toFixed(2) + '</span>';
     html += '</div>';
     
     breakdownList.innerHTML = html;
